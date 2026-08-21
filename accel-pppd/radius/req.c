@@ -75,6 +75,12 @@ static struct rad_req_t *__rad_req_alloc(struct radius_pd_t *rpd, int code, cons
 	if (!req->pack)
 		goto out_err;
 
+	/*
+	 * Keep this ahead of every other attribute: the mitigation relies on
+	 * the packet starting with 16 octets the attacker cannot predict, so
+	 * the Message-Authenticator SHOULD be the first attribute of an
+	 * Access-Request.
+	 */
 	if (code == CODE_ACCESS_REQUEST && conf_blast_protection) {
 		uint8_t buf[HMAC_MD5_LEN] = {0};
 		req->pack->message_authenticator = 1;

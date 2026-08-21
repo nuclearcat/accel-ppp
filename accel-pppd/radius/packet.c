@@ -28,8 +28,8 @@
 #include "memdebug.h"
 
 #define HMAC_MD5_LEN 16
-/* Radius header + attribute: type + length */
-#define PACKET_SIGNED_OFFSET (20 + 2)
+/* Radius header: code + id + length + authenticator */
+#define PACKET_HDR_LEN 20
 
 static mempool_t packet_pool;
 static mempool_t attr_pool;
@@ -865,6 +865,31 @@ struct rad_attr_t __export *rad_packet_find_attr(struct rad_packet_t *pack, cons
 	return NULL;
 }
 
+/*
+ * Locate the value field of the Message-Authenticator attribute inside an
+ * already built packet. Attributes are serialized in the order they were
+ * added, so the attribute has no fixed offset: walk the chain instead of
+ * assuming it is the first one.
+ */
+static uint8_t *find_message_authenticator(uint8_t *buf, int len)
+{
+	int off = PACKET_HDR_LEN;
+
+	while (off + 2 <= len) {
+		int attr_len = buf[off + 1];
+
+		if (attr_len < 2 || off + attr_len > len)
+			return NULL;
+
+		if (buf[off] == Message_Authenticator && attr_len == HMAC_MD5_LEN + 2)
+			return buf + off + 2;
+
+		off += attr_len;
+	}
+
+	return NULL;
+}
+
 int rad_packet_send(struct rad_packet_t *pack, int fd, struct sockaddr_in *addr)
 {
 	int n;
@@ -873,8 +898,18 @@ int rad_packet_send(struct rad_packet_t *pack, int fd, struct sockaddr_in *addr)
 
 	if (pack->secret && pack->message_authenticator) {
 		uint8_t hmac[HMAC_MD5_LEN];
-		uint8_t *ptr = pack->buf;
-		uint8_t *hmac_ptr = ptr + PACKET_SIGNED_OFFSET;
+		uint8_t *hmac_ptr = find_message_authenticator(pack->buf, pack->len);
+
+		if (!hmac_ptr) {
+			log_emerg("radius:packet: Message-Authenticator attribute not found\n");
+			return -1;
+		}
+
+		/* The signature covers the attribute with its own value zeroed.
+		 * It must be cleared on every send, not just the first one, or
+		 * retransmissions would sign over the previous signature. */
+		memset(hmac_ptr, 0, HMAC_MD5_LEN);
+
 		if (hmac_md5((const uint8_t *)pack->secret, strlen((const char *)pack->secret), pack->buf, pack->len, hmac) < 0) {
 			log_emerg("radius:packet: failed to calculate HMAC\n");
 			return -1;
