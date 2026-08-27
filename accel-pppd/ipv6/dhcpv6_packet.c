@@ -208,6 +208,16 @@ static size_t dhcpv6_packet_tailroom(const struct dhcpv6_packet *pkt)
 	return room > 0 ? (size_t)room : 0;
 }
 
+size_t dhcpv6_option_space(const struct dhcpv6_packet *pkt)
+{
+	size_t room = dhcpv6_packet_tailroom(pkt);
+
+	if (room <= sizeof(struct dhcpv6_opt_hdr))
+		return 0;
+
+	return room - sizeof(struct dhcpv6_opt_hdr);
+}
+
 struct dhcpv6_option *dhcpv6_option_alloc(struct dhcpv6_packet *pkt, int code, int len)
 {
 	struct dhcpv6_option *opt;
