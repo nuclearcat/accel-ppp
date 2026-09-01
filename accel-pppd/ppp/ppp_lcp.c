@@ -47,22 +47,6 @@ static void send_term_req(struct ppp_fsm_t *fsm);
 static void send_term_ack(struct ppp_fsm_t *fsm);
 static void lcp_recv(struct ppp_handler_t*);
 
-static uint16_t lcp_read_u16(const void *ptr)
-{
-	uint16_t value;
-
-	memcpy(&value, ptr, sizeof(value));
-	return ntohs(value);
-}
-
-static uint32_t lcp_read_u32(const void *ptr)
-{
-	uint32_t value;
-
-	memcpy(&value, ptr, sizeof(value));
-	return ntohl(value);
-}
-
 static void lcp_options_init(struct ppp_lcp_t *lcp)
 {
 	struct lcp_option_t *lopt;
@@ -627,7 +611,7 @@ static void lcp_recv_echo_repl(struct ppp_lcp_t *lcp, uint8_t *data, int size)
 		if (conf_ppp_verbose)
 			log_ppp_debug("recv [LCP EchoRep id=%x]\n", lcp->fsm.recv_id);
 	} else {
-		magic = lcp_read_u32(data);
+		magic = u_read_be32(data);
 
 		if (conf_ppp_verbose)
 			log_ppp_debug("recv [LCP EchoRep id=%x <magic %08x>]\n", lcp->fsm.recv_id, magic);
@@ -881,7 +865,7 @@ static void lcp_recv(struct ppp_handler_t*h)
 				break;
 			}
 			if (conf_ppp_verbose)
-				log_ppp_debug("recv [LCP EchoReq id=%x <magic %08x>]\n", hdr->id, lcp_read_u32(hdr + 1));
+				log_ppp_debug("recv [LCP EchoReq id=%x <magic %08x>]\n", hdr->id, u_read_be32(hdr + 1));
 			send_echo_reply(lcp);
 			break;
 		case ECHOREP:
@@ -897,11 +881,11 @@ static void lcp_recv(struct ppp_handler_t*h)
 					log_ppp_warn("LCP: short ProtoRej received\n");
 					break;
 				}
-				log_ppp_info2("recv [LCP ProtoRej id=%x <%04x>]\n", hdr->id, lcp_read_u16(hdr + 1));
+				log_ppp_info2("recv [LCP ProtoRej id=%x <%04x>]\n", hdr->id, u_read_be16(hdr + 1));
 			}
 			if (len < PPP_HDRLEN + 2 || buf_len < (int)(sizeof(*hdr) + 2))
 				break;
-			ppp_recv_proto_rej(lcp->ppp, lcp_read_u16(hdr + 1));
+			ppp_recv_proto_rej(lcp->ppp, u_read_be16(hdr + 1));
 			break;
 		case DISCARDREQ:
 			if (conf_ppp_verbose) {
@@ -909,7 +893,7 @@ static void lcp_recv(struct ppp_handler_t*h)
 					log_ppp_warn("LCP: short DiscardReq received\n");
 					break;
 				}
-				log_ppp_info2("recv [LCP DiscardReq id=%x <magic %08x>]\n", hdr->id, lcp_read_u32(hdr + 1));
+				log_ppp_info2("recv [LCP DiscardReq id=%x <magic %08x>]\n", hdr->id, u_read_be32(hdr + 1));
 			}
 			break;
 		case IDENT:

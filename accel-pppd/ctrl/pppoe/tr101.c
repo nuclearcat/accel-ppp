@@ -8,6 +8,7 @@
 #include "log.h"
 #include "radius.h"
 #include "memdebug.h"
+#include "utils.h"
 
 #include "pppoe.h"
 
@@ -29,14 +30,6 @@
 #define OPT_ACTUAL_INTER_DELAY_DOWN   0x8E
 #define ACCESS_LOOP_ENCAP             0x90
 #define IFW_SESSION                   0xFE
-
-static uint32_t tr101_read_u32(const void *ptr)
-{
-	uint32_t value;
-
-	memcpy(&value, ptr, sizeof(value));
-	return ntohl(value);
-}
 
 static int tr101_send_request(struct pppoe_tag *tr101, struct rad_packet_t *pack, int type)
 {
@@ -83,85 +76,85 @@ static int tr101_send_request(struct pppoe_tag *tr101, struct rad_packet_t *pack
 			case OPT_ACTUAL_DATA_RATE_UP:
 				if (len != 4)
 					goto inval;
-				if (rad_packet_add_int(pack, "ADSL-Forum", "Actual-Data-Rate-Upstream", tr101_read_u32(ptr)))
+				if (rad_packet_add_int(pack, "ADSL-Forum", "Actual-Data-Rate-Upstream", u_read_be32(ptr)))
 					return -1;
 				break;
 			case OPT_ACTUAL_DATA_RATE_DOWN:
 				if (len != 4)
 					goto inval;
-				if (rad_packet_add_int(pack, "ADSL-Forum", "Actual-Data-Rate-Downstream", tr101_read_u32(ptr)))
+				if (rad_packet_add_int(pack, "ADSL-Forum", "Actual-Data-Rate-Downstream", u_read_be32(ptr)))
 					return -1;
 				break;
 			case OPT_MIN_DATA_RATE_UP:
 				if (len != 4)
 					goto inval;
-				if (rad_packet_add_int(pack, "ADSL-Forum", "Minimum-Data-Rate-Upstream", tr101_read_u32(ptr)))
+				if (rad_packet_add_int(pack, "ADSL-Forum", "Minimum-Data-Rate-Upstream", u_read_be32(ptr)))
 					return -1;
 				break;
 			case OPT_MIN_DATA_RATE_DOWN:
 				if (len != 4)
 					goto inval;
-				if (rad_packet_add_int(pack, "ADSL-Forum", "Minimum-Data-Rate-Downstream", tr101_read_u32(ptr)))
+				if (rad_packet_add_int(pack, "ADSL-Forum", "Minimum-Data-Rate-Downstream", u_read_be32(ptr)))
 					return -1;
 				break;
 			case OPT_ATT_DATA_RATE_UP:
 				if (len != 4)
 					goto inval;
-				if (rad_packet_add_int(pack, "ADSL-Forum", "Attainable-Data-Rate-Upstream", tr101_read_u32(ptr)))
+				if (rad_packet_add_int(pack, "ADSL-Forum", "Attainable-Data-Rate-Upstream", u_read_be32(ptr)))
 					return -1;
 				break;
 			case OPT_ATT_DATA_RATE_DOWN:
 				if (len != 4)
 					goto inval;
-				if (rad_packet_add_int(pack, "ADSL-Forum", "Attainable-Data-Rate-Downstream", tr101_read_u32(ptr)))
+				if (rad_packet_add_int(pack, "ADSL-Forum", "Attainable-Data-Rate-Downstream", u_read_be32(ptr)))
 					return -1;
 				break;
 			case OPT_MAX_DATA_RATE_UP:
 				if (len != 4)
 					goto inval;
-				if (rad_packet_add_int(pack, "ADSL-Forum", "Maximum-Data-Rate-Upstream", tr101_read_u32(ptr)))
+				if (rad_packet_add_int(pack, "ADSL-Forum", "Maximum-Data-Rate-Upstream", u_read_be32(ptr)))
 					return -1;
 				break;
 			case OPT_MAX_DATA_RATE_DOWN:
 				if (len != 4)
 					goto inval;
-				if (rad_packet_add_int(pack, "ADSL-Forum", "Maximum-Data-Rate-Downstream", tr101_read_u32(ptr)))
+				if (rad_packet_add_int(pack, "ADSL-Forum", "Maximum-Data-Rate-Downstream", u_read_be32(ptr)))
 					return -1;
 				break;
 			case OPT_MIN_DATA_RATE_UP_LP:
 				if (len != 4)
 					goto inval;
-				if (rad_packet_add_int(pack, "ADSL-Forum", "Minimum-Data-Rate-Upstream-Low-Power", tr101_read_u32(ptr)))
+				if (rad_packet_add_int(pack, "ADSL-Forum", "Minimum-Data-Rate-Upstream-Low-Power", u_read_be32(ptr)))
 					return -1;
 				break;
 			case OPT_MIN_DATA_RATE_DOWN_LP:
 				if (len != 4)
 					goto inval;
-				if (rad_packet_add_int(pack, "ADSL-Forum", "Minimum-Data-Rate-Downstream-Low-Power", tr101_read_u32(ptr)))
+				if (rad_packet_add_int(pack, "ADSL-Forum", "Minimum-Data-Rate-Downstream-Low-Power", u_read_be32(ptr)))
 					return -1;
 				break;
 			case OPT_MAX_INTERL_DELAY_UP:
 				if (len != 4)
 					goto inval;
-				if (rad_packet_add_int(pack, "ADSL-Forum", "Maximum-Interleaving-Delay-Upstream", tr101_read_u32(ptr)))
+				if (rad_packet_add_int(pack, "ADSL-Forum", "Maximum-Interleaving-Delay-Upstream", u_read_be32(ptr)))
 					return -1;
 				break;
 			case OPT_ACTUAL_INTERL_DELAY_UP:
 				if (len != 4)
 					goto inval;
-				if (rad_packet_add_int(pack, "ADSL-Forum", "Actual-Interleaving-Delay-Upstream", tr101_read_u32(ptr)))
+				if (rad_packet_add_int(pack, "ADSL-Forum", "Actual-Interleaving-Delay-Upstream", u_read_be32(ptr)))
 					return -1;
 				break;
 			case OPT_MAX_INTER_DELAY_DOWN:
 				if (len != 4)
 					goto inval;
-				if (rad_packet_add_int(pack, "ADSL-Forum", "Maximum-Interleaving-Delay-Downstream", tr101_read_u32(ptr)))
+				if (rad_packet_add_int(pack, "ADSL-Forum", "Maximum-Interleaving-Delay-Downstream", u_read_be32(ptr)))
 					return -1;
 				break;
 			case OPT_ACTUAL_INTER_DELAY_DOWN:
 				if (len != 4)
 					goto inval;
-				if (rad_packet_add_int(pack, "ADSL-Forum", "Actual-Interleaving-Delay-Downstream", tr101_read_u32(ptr)))
+				if (rad_packet_add_int(pack, "ADSL-Forum", "Actual-Interleaving-Delay-Downstream", u_read_be32(ptr)))
 					return -1;
 				break;
 			case ACCESS_LOOP_ENCAP:

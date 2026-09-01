@@ -4,6 +4,7 @@
 
 #include "log.h"
 #include "memdebug.h"
+#include "utils.h"
 
 #include "dhcpv6.h"
 
@@ -33,14 +34,6 @@ static void print_reconf(struct dhcpv6_option *opt, void (*print)(const char *fm
 static void print_dnssl(struct dhcpv6_option *opt, void (*print)(const char *fmt, ...));
 static void print_ia_prefix(struct dhcpv6_option *opt, void (*print)(const char *fmt, ...));
 static void print_aftr_gw(struct dhcpv6_option *opt, void (*print)(const char *fmt, ...));
-
-static uint16_t dhcpv6_read_u16(const void *ptr)
-{
-	uint16_t value;
-
-	memcpy(&value, ptr, sizeof(value));
-	return ntohs(value);
-}
 
 static struct dict_option known_options[] = {
 	{ D6_OPTION_CLIENTID, "Client-ID", 1, sizeof(uint16_t), 0, print_clientid },
@@ -497,7 +490,7 @@ static void print_oro(struct dhcpv6_option *opt, void (*print)(const char *fmt, 
 		else
 			print(" ");
 
-		code = dhcpv6_read_u16(ptr);
+		code = u_read_be16(ptr);
 		for (dopt = known_options; dopt->code; dopt++) {
 			if (code == dopt->code)
 				break;
@@ -531,13 +524,10 @@ static void print_uint8(struct dhcpv6_option *opt, void (*print)(const char *fmt
 
 static void print_time(struct dhcpv6_option *opt, void (*print)(const char *fmt, ...))
 {
-	uint16_t val;
-
-	if (ntohs(opt->hdr->len) < sizeof(val))
+	if (ntohs(opt->hdr->len) < sizeof(uint16_t))
 		return;
 
-	memcpy(&val, opt->hdr->data, sizeof(val));
-	print(" %u", ntohs(val));
+	print(" %u", u_read_be16(opt->hdr->data));
 }
 
 static void print_ipv6addr(struct dhcpv6_option *opt, void (*print)(const char *fmt, ...))

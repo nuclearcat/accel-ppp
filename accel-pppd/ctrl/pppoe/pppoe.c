@@ -554,22 +554,6 @@ static void print_tag_octets(struct pppoe_tag *tag)
 		log_info2("%02x", (uint8_t)tag->tag_data[i]);
 }
 
-static uint16_t pppoe_read_u16(const void *ptr)
-{
-	uint16_t value;
-
-	memcpy(&value, ptr, sizeof(value));
-	return ntohs(value);
-}
-
-static uint32_t pppoe_read_u32(const void *ptr)
-{
-	uint32_t value;
-
-	memcpy(&value, ptr, sizeof(value));
-	return ntohl(value);
-}
-
 static void print_tag_u16(struct pppoe_tag *tag)
 {
 	if (ntohs(tag->tag_len) != sizeof(uint16_t)) {
@@ -577,7 +561,7 @@ static void print_tag_u16(struct pppoe_tag *tag)
 		return;
 	}
 
-	log_info2("%i", pppoe_read_u16(tag->tag_data));
+	log_info2("%i", u_read_be16(tag->tag_data));
 }
 
 static void print_packet(const char *ifname, const char *op, uint8_t *pack)
@@ -654,7 +638,7 @@ static void print_packet(const char *ifname, const char *op, uint8_t *pack)
 				if (ntohs(tag->tag_len) < 4)
 					log_info2(" <Vendor-Specific invalid>");
 				else
-					log_info2(" <Vendor-Specific %x>", pppoe_read_u32(tag->tag_data));
+					log_info2(" <Vendor-Specific %x>", u_read_be32(tag->tag_data));
 				break;
 			case TAG_RELAY_SESSION_ID:
 				log_info2(" <Relay-Session-Id ");
@@ -1101,7 +1085,7 @@ static void pppoe_recv_PADI(struct pppoe_serv_t *serv, uint8_t *pack, int size)
 				break;
 			case TAG_PPP_MAX_PAYLOAD:
 				if (ntohs(tag->tag_len) == 2)
-					ppp_max_payload = pppoe_read_u16(tag->tag_data);
+					ppp_max_payload = u_read_be16(tag->tag_data);
 				break;
 		}
 	}
@@ -1248,14 +1232,14 @@ static void pppoe_recv_PADR(struct pppoe_serv_t *serv, uint8_t *pack, int size)
 			case TAG_VENDOR_SPECIFIC:
 				if (ntohs(tag->tag_len) < 4)
 					continue;
-				vendor_id = pppoe_read_u32(tag->tag_data);
+				vendor_id = u_read_be32(tag->tag_data);
 				if (vendor_id == VENDOR_ADSL_FORUM)
 					if (conf_tr101)
 						tr101_tag = tag;
 				break;
 			case TAG_PPP_MAX_PAYLOAD:
 				if (ntohs(tag->tag_len) == 2)
-					ppp_max_payload = pppoe_read_u16(tag->tag_data);
+					ppp_max_payload = u_read_be16(tag->tag_data);
 				break;
 		}
 	}

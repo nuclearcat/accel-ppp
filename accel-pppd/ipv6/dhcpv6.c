@@ -23,6 +23,7 @@
 #include "ipv6_dns.h"
 #include "events.h"
 #include "iputils.h"
+#include "utils.h"
 
 #include "dhcpv6.h"
 
@@ -229,8 +230,7 @@ static void insert_oro(struct dhcpv6_packet *reply, struct dhcpv6_option *opt)
 	struct in6_addr dns[MAX_DNS_COUNT];
 
 	for (i = ntohs(opt->hdr->len) / 2, ptr = opt->hdr->data; i; i--, ptr += sizeof(code)) {
-		memcpy(&code, ptr, sizeof(code));
-		code = ntohs(code);
+		code = u_read_be16(ptr);
 		if (code == D6_OPTION_DNS_SERVERS) {
 			dns_count = ipv6_dns_get(reply->ses, conf_dns, conf_dns_count,
 						 dns, MAX_DNS_COUNT);

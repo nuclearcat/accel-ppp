@@ -24,6 +24,7 @@
 #include "mempool.h"
 #include "radius_p.h"
 #include "attr_defs.h"
+#include "utils.h"
 
 #include "memdebug.h"
 
@@ -34,34 +35,6 @@
 static mempool_t packet_pool;
 static mempool_t attr_pool;
 static mempool_t buf_pool;
-
-static uint16_t radius_read_u16(const void *ptr)
-{
-	uint16_t value;
-
-	memcpy(&value, ptr, sizeof(value));
-	return ntohs(value);
-}
-
-static uint32_t radius_read_u32(const void *ptr)
-{
-	uint32_t value;
-
-	memcpy(&value, ptr, sizeof(value));
-	return ntohl(value);
-}
-
-static void radius_write_u16(void *ptr, uint16_t value)
-{
-	value = htons(value);
-	memcpy(ptr, &value, sizeof(value));
-}
-
-static void radius_write_u32(void *ptr, uint32_t value)
-{
-	value = htonl(value);
-	memcpy(ptr, &value, sizeof(value));
-}
 
 struct rad_packet_t *rad_packet_alloc(int code)
 {
@@ -139,20 +112,20 @@ int rad_packet_build(struct rad_packet_t *pack, uint8_t *RA)
 
 	*ptr = pack->code; ptr++;
 	*ptr = pack->id; ptr++;
-	radius_write_u16(ptr, pack->len); ptr += 2;
+	u_write_be16(ptr, pack->len); ptr += 2;
 	memcpy(ptr, RA, 16);	ptr+=16;
 
 	list_for_each_entry(attr, &pack->attrs, entry) {
 		if (attr->vendor) {
 			*ptr = 26; ptr++;
 			*ptr = attr->len + 2 + 6; ptr++;
-			radius_write_u32(ptr, attr->vendor->id); ptr += 4;
+			u_write_be32(ptr, attr->vendor->id); ptr += 4;
 		}
 		*ptr = attr->attr->id; ptr++;
 		*ptr = attr->len + 2; ptr++;
 		switch(attr->attr->type) {
 			case ATTR_TYPE_INTEGER:
-				radius_write_u32(ptr, attr->val.integer);
+				u_write_be32(ptr, attr->val.integer);
 				break;
 			case ATTR_TYPE_OCTETS:
 			case ATTR_TYPE_STRING:
@@ -164,7 +137,7 @@ int rad_packet_build(struct rad_packet_t *pack, uint8_t *RA)
 				memcpy(ptr, &attr->val, attr->len);
 				break;
 			case ATTR_TYPE_DATE:
-				radius_write_u32(ptr, attr->val.date);
+				u_write_be32(ptr, attr->val.date);
 				break;
 			case ATTR_TYPE_IPV6PREFIX:
 				ptr[0] = 0;
@@ -232,7 +205,7 @@ int rad_packet_recv(int fd, struct rad_packet_t **p, struct sockaddr_in *addr)
 
 	pack->code = *ptr; ptr++;
 	pack->id = *ptr; ptr++;
-	pack->len = radius_read_u16(ptr); ptr += 2;
+	pack->len = u_read_be16(ptr); ptr += 2;
 
 	if (pack->len < 20 || pack->len > n) {
 		log_ppp_warn("radius:packet: short packet received %i, expected %i\n", pack->len, n);
@@ -263,7 +236,7 @@ int rad_packet_recv(int fd, struct rad_packet_t **p, struct sockaddr_in *addr)
 				log_ppp_warn("radius:packet: vendor attribute too short (%i)\n", len);
 				goto out_err;
 			}
-			vendor_id = radius_read_u32(ptr);
+			vendor_id = u_read_be32(ptr);
 			vendor = rad_dict_find_vendor_id(vendor_id);
 			if (vendor) {
 				if (len < 4 + vendor->tag + vendor->len) {
@@ -273,14 +246,14 @@ int rad_packet_recv(int fd, struct rad_packet_t **p, struct sockaddr_in *addr)
 				ptr += 4;
 
 				if (vendor->tag == 2)
-					id = radius_read_u16(ptr);
+					id = u_read_be16(ptr);
 				else
 					id = *ptr;
 
 				ptr += vendor->tag;
 
 				if (vendor->len == 2)
-					len = radius_read_u16(ptr);
+					len = u_read_be16(ptr);
 				else
 					len = *ptr;
 
@@ -333,15 +306,15 @@ int rad_packet_recv(int fd, struct rad_packet_t **p, struct sockaddr_in *addr)
 							break;
 						}
 						if (len == 4)
-							attr->val.integer = radius_read_u32(ptr);
+							attr->val.integer = u_read_be32(ptr);
 						else if (len == 2)
-							attr->val.integer = radius_read_u16(ptr);
+							attr->val.integer = u_read_be16(ptr);
 						else if (len == 1)
 							attr->val.integer = *ptr;
 						break;
 					case ATTR_TYPE_DATE:
 						if (len == 4)
-							attr->val.integer = radius_read_u32(ptr);
+							attr->val.integer = u_read_be32(ptr);
 						else
 							log_ppp_warn("radius:packet: attribute %s has invalid length %i (must be 4)\n", da->name, len);
 						break;

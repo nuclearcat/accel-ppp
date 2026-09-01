@@ -6,6 +6,7 @@
 
 #include "log.h"
 #include "memdebug.h"
+#include "utils.h"
 
 #include "backup.h"
 #include "ap_session_backup.h"
@@ -23,26 +24,6 @@
 #define RAD_TAG_ACCT_SERVER_PORT           10
 #define RAD_TAG_IDLE_TIMEOUT               11
 
-static uint16_t backup_read_u16(const void *ptr)
-{
-	uint16_t value;
-	memcpy(&value, ptr, sizeof(value));
-	return value;
-}
-
-static uint32_t backup_read_u32(const void *ptr)
-{
-	uint32_t value;
-	memcpy(&value, ptr, sizeof(value));
-	return value;
-}
-
-static uint64_t backup_read_u64(const void *ptr)
-{
-	uint64_t value;
-	memcpy(&value, ptr, sizeof(value));
-	return value;
-}
 #define RAD_TAG_ACCT_USERNAME              12
 
 
@@ -115,10 +96,10 @@ static void restore_ipv4_addr(struct ap_session *ses)
 	list_for_each_entry(tag, &m->tag_list, entry) {
 		switch (tag->id) {
 			case SES_TAG_IPV4_ADDR:
-				ses->ipv4->addr = backup_read_u32(tag->data);
+				ses->ipv4->addr = u_read_native32(tag->data);
 				break;
 			case SES_TAG_IPV4_PEER_ADDR:
-				ses->ipv4->peer_addr = backup_read_u32(tag->data);
+				ses->ipv4->peer_addr = u_read_native32(tag->data);
 				break;
 		}
 	}
@@ -142,16 +123,16 @@ void radius_restore_session(struct ap_session *ses, struct radius_pd_t *rpd)
 	list_for_each_entry(tag, &m->tag_list, entry) {
 		switch (tag->id) {
 			case RAD_TAG_INTERIM_INTERVAL:
-				rpd->acct_interim_interval = backup_read_u32(tag->data);
+				rpd->acct_interim_interval = u_read_native32(tag->data);
 				break;
 			case RAD_TAG_INTERIM_JITTER:
-				rpd->acct_interim_jitter = backup_read_u32(tag->data);
+				rpd->acct_interim_jitter = u_read_native32(tag->data);
 				break;
 			case RAD_TAG_SESSION_TIMEOUT:
-				rpd->session_timeout.expire_tv.tv_sec = backup_read_u64(tag->data) - ses->start_time;
+				rpd->session_timeout.expire_tv.tv_sec = u_read_native64(tag->data) - ses->start_time;
 				break;
 			case RAD_TAG_IDLE_TIMEOUT:
-				rpd->idle_timeout.period = backup_read_u32(tag->data) * 1000;
+				rpd->idle_timeout.period = u_read_native32(tag->data) * 1000;
 				break;
 			case RAD_TAG_IPV4_ADDR:
 				ses->ipv4 = &rpd->ipv4_addr;
@@ -171,16 +152,16 @@ void radius_restore_session(struct ap_session *ses, struct radius_pd_t *rpd)
 				rpd->attr_state_len = tag->size;
 				break;
 			case RAD_TAG_TERMINATION_ACTION:
-				rpd->termination_action = backup_read_u32(tag->data);
+				rpd->termination_action = u_read_native32(tag->data);
 				break;
 			case RAD_TAG_ACCT_USERNAME:
 				rpd->acct_username = _strndup(tag->data, tag->size);
 				break;
 			case RAD_TAG_ACCT_SERVER_ADDR:
-				acct_addr = backup_read_u32(tag->data);
+				acct_addr = u_read_native32(tag->data);
 				break;
 			case RAD_TAG_ACCT_SERVER_PORT:
-				acct_port = backup_read_u16(tag->data);
+				acct_port = u_read_native16(tag->data);
 				break;
 		}
 	}
