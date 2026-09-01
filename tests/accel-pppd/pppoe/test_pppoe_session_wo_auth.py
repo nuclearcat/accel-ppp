@@ -17,6 +17,9 @@ def accel_pppd_config(veth_pair_netns):
     [core]
     log-error=/dev/stderr
 
+    [ppp]
+    mppe=prefer
+
     [log]
     log-debug=/dev/stdout
     log-file=/dev/stdout

@@ -102,11 +102,12 @@ static int setup_mppe_key(int fd, int transmit, uint8_t *key)
 {
 	struct ppp_option_data data;
 	uint8_t buf[6 + 16];
+	uint32_t bits = htonl(MPPE_S | MPPE_H);
 
 	memset(buf, 0, sizeof(buf));
 	buf[0] = CI_MPPE;
 	buf[1] = 6;
-	*(uint32_t*)(buf + 2) = htonl(MPPE_S | MPPE_H);
+	memcpy(buf + 2, &bits, sizeof(bits));
 	if (key)
 		memcpy(buf + 6, key, 16);
 
