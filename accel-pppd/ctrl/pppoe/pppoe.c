@@ -554,9 +554,30 @@ static void print_tag_octets(struct pppoe_tag *tag)
 		log_info2("%02x", (uint8_t)tag->tag_data[i]);
 }
 
+static uint16_t pppoe_read_u16(const void *ptr)
+{
+	uint16_t value;
+
+	memcpy(&value, ptr, sizeof(value));
+	return ntohs(value);
+}
+
+static uint32_t pppoe_read_u32(const void *ptr)
+{
+	uint32_t value;
+
+	memcpy(&value, ptr, sizeof(value));
+	return ntohl(value);
+}
+
 static void print_tag_u16(struct pppoe_tag *tag)
 {
-	log_info2("%i", (uint16_t)ntohs(*(uint16_t *)tag->tag_data));
+	if (ntohs(tag->tag_len) != sizeof(uint16_t)) {
+		log_info2("invalid");
+		return;
+	}
+
+	log_info2("%i", pppoe_read_u16(tag->tag_data));
 }
 
 static void print_packet(const char *ifname, const char *op, uint8_t *pack)
@@ -633,7 +654,7 @@ static void print_packet(const char *ifname, const char *op, uint8_t *pack)
 				if (ntohs(tag->tag_len) < 4)
 					log_info2(" <Vendor-Specific invalid>");
 				else
-					log_info2(" <Vendor-Specific %x>", ntohl(*(uint32_t *)tag->tag_data));
+					log_info2(" <Vendor-Specific %x>", pppoe_read_u32(tag->tag_data));
 				break;
 			case TAG_RELAY_SESSION_ID:
 				log_info2(" <Relay-Session-Id ");
@@ -701,7 +722,10 @@ static void generate_cookie(struct pppoe_serv_t *serv, const uint8_t *src, uint8
 	} else
 		memset(u1.raw + 16, 0, 4);
 
-	*(uint32_t *)(u1.raw + 20) = ts.tv_sec + conf_cookie_timeout;
+	{
+		uint32_t expires = ts.tv_sec + conf_cookie_timeout;
+		memcpy(u1.raw + 20, &expires, sizeof(expires));
+	}
 
 	for (i = 0; i < 3; i++)
 		DES_ecb_encrypt(&u1.b[i], &u2.b[i], &ks, DES_ENCRYPT);
@@ -739,8 +763,12 @@ static int check_cookie(struct pppoe_serv_t *serv, const uint8_t *src, const uin
 	for (i = 0; i < 3; i++)
 		DES_ecb_encrypt(&u2.b[i], &u1.b[i], &ks, DES_DECRYPT);
 
-	if (*(uint32_t *)(u1.raw + 20) < ts.tv_sec)
-		return 1;
+	{
+		uint32_t expires;
+		memcpy(&expires, u1.raw + 20, sizeof(expires));
+		if (expires < ts.tv_sec)
+			return 1;
+	}
 
 	MD5_Init(&ctx);
 	MD5_Update(&ctx, serv->secret, SECRET_LENGTH);
@@ -1073,7 +1101,7 @@ static void pppoe_recv_PADI(struct pppoe_serv_t *serv, uint8_t *pack, int size)
 				break;
 			case TAG_PPP_MAX_PAYLOAD:
 				if (ntohs(tag->tag_len) == 2)
-					ppp_max_payload = ntohs(*(uint16_t *)tag->tag_data);
+					ppp_max_payload = pppoe_read_u16(tag->tag_data);
 				break;
 		}
 	}
@@ -1220,14 +1248,14 @@ static void pppoe_recv_PADR(struct pppoe_serv_t *serv, uint8_t *pack, int size)
 			case TAG_VENDOR_SPECIFIC:
 				if (ntohs(tag->tag_len) < 4)
 					continue;
-				vendor_id = ntohl(*(uint32_t *)tag->tag_data);
+				vendor_id = pppoe_read_u32(tag->tag_data);
 				if (vendor_id == VENDOR_ADSL_FORUM)
 					if (conf_tr101)
 						tr101_tag = tag;
 				break;
 			case TAG_PPP_MAX_PAYLOAD:
 				if (ntohs(tag->tag_len) == 2)
-					ppp_max_payload = ntohs(*(uint16_t *)tag->tag_data);
+					ppp_max_payload = pppoe_read_u16(tag->tag_data);
 				break;
 		}
 	}
