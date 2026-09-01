@@ -47,6 +47,22 @@ static void send_term_req(struct ppp_fsm_t *fsm);
 static void send_term_ack(struct ppp_fsm_t *fsm);
 static void lcp_recv(struct ppp_handler_t*);
 
+static uint16_t lcp_read_u16(const void *ptr)
+{
+	uint16_t value;
+
+	memcpy(&value, ptr, sizeof(value));
+	return ntohs(value);
+}
+
+static uint32_t lcp_read_u32(const void *ptr)
+{
+	uint32_t value;
+
+	memcpy(&value, ptr, sizeof(value));
+	return ntohl(value);
+}
+
 static void lcp_options_init(struct ppp_lcp_t *lcp)
 {
 	struct lcp_option_t *lopt;
@@ -370,10 +386,13 @@ static int lcp_recv_conf_req(struct ppp_lcp_t *lcp, uint8_t *data, int size)
 	lcp->ropt_len = size;
 
 	while (size > 0) {
+		if (size < sizeof(*hdr))
+			return LCP_OPT_FAIL;
+
 		hdr = (struct lcp_opt_hdr_t *)data;
 
-		if (!hdr->len || hdr->len > size)
-			break;
+		if (hdr->len < sizeof(*hdr) || hdr->len > size)
+			return LCP_OPT_FAIL;
 
 		ropt = _malloc(sizeof(*ropt));
 		memset(ropt, 0, sizeof(*ropt));
@@ -462,10 +481,17 @@ static int lcp_recv_conf_rej(struct ppp_lcp_t *lcp, uint8_t *data, int size)
 	}
 
 	while (size > 0) {
+		if (size < sizeof(*hdr)) {
+			res = -1;
+			break;
+		}
+
 		hdr = (struct lcp_opt_hdr_t *)data;
 
-		if (!hdr->len || hdr->len > size)
+		if (hdr->len < sizeof(*hdr) || hdr->len > size) {
+			res = -1;
 			break;
+		}
 
 		list_for_each_entry(lopt, &lcp->options, entry) {
 			if (lopt->id == hdr->id) {
@@ -507,10 +533,17 @@ static int lcp_recv_conf_nak(struct ppp_lcp_t *lcp, uint8_t *data, int size)
 	}
 
 	while (size > 0) {
+		if (size < sizeof(*hdr)) {
+			res = -1;
+			break;
+		}
+
 		hdr = (struct lcp_opt_hdr_t *)data;
 
-		if (!hdr->len || hdr->len > size)
+		if (hdr->len < sizeof(*hdr) || hdr->len > size) {
+			res = -1;
 			break;
+		}
 
 		list_for_each_entry(lopt,&lcp->options,entry) {
 			if (lopt->id == hdr->id) {
@@ -550,10 +583,17 @@ static int lcp_recv_conf_ack(struct ppp_lcp_t *lcp, uint8_t *data, int size)
 	}
 
 	while (size > 0) {
+		if (size < sizeof(*hdr)) {
+			res = -1;
+			break;
+		}
+
 		hdr = (struct lcp_opt_hdr_t *)data;
 
-		if (!hdr->len || hdr->len > size)
+		if (hdr->len < sizeof(*hdr) || hdr->len > size) {
+			res = -1;
 			break;
+		}
 
 		list_for_each_entry(lopt, &lcp->options, entry) {
 			if (lopt->id == hdr->id) {
@@ -587,7 +627,7 @@ static void lcp_recv_echo_repl(struct ppp_lcp_t *lcp, uint8_t *data, int size)
 		if (conf_ppp_verbose)
 			log_ppp_debug("recv [LCP EchoRep id=%x]\n", lcp->fsm.recv_id);
 	} else {
-		magic = ntohl(*(uint32_t *)data);
+		magic = lcp_read_u32(data);
 
 		if (conf_ppp_verbose)
 			log_ppp_debug("recv [LCP EchoRep id=%x <magic %08x>]\n", lcp->fsm.recv_id, magic);
@@ -746,7 +786,7 @@ static void lcp_recv(struct ppp_handler_t*h)
 	hdr = (struct lcp_hdr_t *)lcp->ppp->buf;
 	len = ntohs(hdr->len);
 	buf_len = lcp->ppp->buf_size;
-	if (len < PPP_HEADERLEN) {
+	if (len < PPP_HEADERLEN || len > lcp->ppp->buf_size - 2) {
 		log_ppp_warn("LCP: short packet received\n");
 		return;
 	}
@@ -802,7 +842,10 @@ static void lcp_recv(struct ppp_handler_t*h)
 			}
 			break;
 		case CONFNAK:
-			lcp_recv_conf_nak(lcp, (uint8_t*)(hdr + 1), ntohs(hdr->len) - PPP_HDRLEN);
+			if (lcp_recv_conf_nak(lcp, (uint8_t*)(hdr + 1), ntohs(hdr->len) - PPP_HDRLEN)) {
+				ap_session_terminate(&lcp->ppp->ses, TERM_USER_ERROR, 0);
+				break;
+			}
 			if (lcp->fsm.recv_id != lcp->fsm.id)
 				break;
 			ppp_fsm_recv_conf_rej(&lcp->fsm);
@@ -838,7 +881,7 @@ static void lcp_recv(struct ppp_handler_t*h)
 				break;
 			}
 			if (conf_ppp_verbose)
-				log_ppp_debug("recv [LCP EchoReq id=%x <magic %08x>]\n", hdr->id, ntohl(*(uint32_t*)(hdr + 1)));
+				log_ppp_debug("recv [LCP EchoReq id=%x <magic %08x>]\n", hdr->id, lcp_read_u32(hdr + 1));
 			send_echo_reply(lcp);
 			break;
 		case ECHOREP:
@@ -854,11 +897,11 @@ static void lcp_recv(struct ppp_handler_t*h)
 					log_ppp_warn("LCP: short ProtoRej received\n");
 					break;
 				}
-				log_ppp_info2("recv [LCP ProtoRej id=%x <%04x>]\n", hdr->id, ntohs(*(uint16_t*)(hdr + 1)));
+				log_ppp_info2("recv [LCP ProtoRej id=%x <%04x>]\n", hdr->id, lcp_read_u16(hdr + 1));
 			}
 			if (len < PPP_HDRLEN + 2 || buf_len < (int)(sizeof(*hdr) + 2))
 				break;
-			ppp_recv_proto_rej(lcp->ppp, ntohs(*(uint16_t *)(hdr + 1)));
+			ppp_recv_proto_rej(lcp->ppp, lcp_read_u16(hdr + 1));
 			break;
 		case DISCARDREQ:
 			if (conf_ppp_verbose) {
@@ -866,7 +909,7 @@ static void lcp_recv(struct ppp_handler_t*h)
 					log_ppp_warn("LCP: short DiscardReq received\n");
 					break;
 				}
-				log_ppp_info2("recv [LCP DiscardReq id=%x <magic %08x>]\n", hdr->id, ntohl(*(uint32_t*)(hdr + 1)));
+				log_ppp_info2("recv [LCP DiscardReq id=%x <magic %08x>]\n", hdr->id, lcp_read_u32(hdr + 1));
 			}
 			break;
 		case IDENT:

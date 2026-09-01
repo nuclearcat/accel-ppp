@@ -387,10 +387,13 @@ static int ccp_recv_conf_req(struct ppp_ccp_t *ccp, uint8_t *data, int size)
 	ccp->ropt_len = size;
 
 	while (size > 0) {
+		if (size < sizeof(*hdr))
+			return CCP_OPT_FAIL;
+
 		hdr = (struct ccp_opt_hdr_t *)data;
 
-		if (!hdr->len || hdr->len > size)
-			break;
+		if (hdr->len < sizeof(*hdr) || hdr->len > size)
+			return CCP_OPT_FAIL;
 
 		ropt = _malloc(sizeof(*ropt));
 		memset(ropt, 0, sizeof(*ropt));
@@ -482,10 +485,17 @@ static int ccp_recv_conf_rej(struct ppp_ccp_t *ccp, uint8_t *data, int size)
 	}*/
 
 	while (size > 0) {
+		if (size < sizeof(*hdr)) {
+			res = -1;
+			break;
+		}
+
 		hdr = (struct ccp_opt_hdr_t *)data;
 
-		if (!hdr->len || hdr->len > size)
+		if (hdr->len < sizeof(*hdr) || hdr->len > size) {
+			res = -1;
 			break;
+		}
 
 		list_for_each_entry(lopt, &ccp->options, entry) {
 			if (lopt->id == hdr->id) {
@@ -523,10 +533,17 @@ static int ccp_recv_conf_nak(struct ppp_ccp_t *ccp, uint8_t *data, int size)
 	}*/
 
 	while (size > 0) {
+		if (size < sizeof(*hdr)) {
+			res = -1;
+			break;
+		}
+
 		hdr = (struct ccp_opt_hdr_t *)data;
 
-		if (!hdr->len || hdr->len > size)
+		if (hdr->len < sizeof(*hdr) || hdr->len > size) {
+			res = -1;
 			break;
+		}
 
 		list_for_each_entry(lopt, &ccp->options, entry) {
 			if (lopt->id == hdr->id) {
@@ -566,10 +583,17 @@ static int ccp_recv_conf_ack(struct ppp_ccp_t *ccp, uint8_t *data, int size)
 	}*/
 
 	while (size > 0) {
+		if (size < sizeof(*hdr)) {
+			res = -1;
+			break;
+		}
+
 		hdr = (struct ccp_opt_hdr_t *)data;
 
-		if (!hdr->len || hdr->len > size)
+		if (hdr->len < sizeof(*hdr) || hdr->len > size) {
+			res = -1;
 			break;
+		}
 
 		list_for_each_entry(lopt, &ccp->options, entry) {
 			if (lopt->id == hdr->id) {
@@ -647,7 +671,7 @@ static void ccp_recv(struct ppp_handler_t*h)
 	}
 
 	hdr = (struct ccp_hdr_t *)ccp->ppp->buf;
-	if (ntohs(hdr->len) < PPP_HEADERLEN) {
+	if (ntohs(hdr->len) < PPP_HEADERLEN || ntohs(hdr->len) > ccp->ppp->buf_size - 2) {
 		log_ppp_warn("CCP: short packet received\n");
 		return;
 	}
@@ -695,8 +719,10 @@ static void ccp_recv(struct ppp_handler_t*h)
 				ppp_fsm_recv_conf_ack(&ccp->fsm);
 			break;
 		case CONFNAK:
-			ccp_recv_conf_nak(ccp, (uint8_t*)(hdr + 1), ntohs(hdr->len) - PPP_HDRLEN);
-			ppp_fsm_recv_conf_rej(&ccp->fsm);
+			if (ccp_recv_conf_nak(ccp, (uint8_t*)(hdr + 1), ntohs(hdr->len) - PPP_HDRLEN))
+				ap_session_terminate(&ccp->ppp->ses, TERM_USER_ERROR, 0);
+			else
+				ppp_fsm_recv_conf_rej(&ccp->fsm);
 			break;
 		case CONFREJ:
 			if (ccp_recv_conf_rej(ccp, (uint8_t*)(hdr + 1),ntohs(hdr->len) - PPP_HDRLEN))

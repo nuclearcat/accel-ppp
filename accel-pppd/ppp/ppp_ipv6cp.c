@@ -395,10 +395,13 @@ static int ipv6cp_recv_conf_req(struct ppp_ipv6cp_t *ipv6cp, uint8_t *data, int 
 	ipv6cp->ropt_len = size;
 
 	while (size > 0) {
+		if (size < sizeof(*hdr))
+			return IPV6CP_OPT_FAIL;
+
 		hdr = (struct ipv6cp_opt_hdr_t *)data;
 
-		if (!hdr->len || hdr->len > size)
-			break;
+		if (hdr->len < sizeof(*hdr) || hdr->len > size)
+			return IPV6CP_OPT_FAIL;
 
 		ropt = _malloc(sizeof(*ropt));
 		memset(ropt, 0, sizeof(*ropt));
@@ -507,10 +510,17 @@ static int ipv6cp_recv_conf_rej(struct ppp_ipv6cp_t *ipv6cp, uint8_t *data, int 
 	}*/
 
 	while (size > 0) {
+		if (size < sizeof(*hdr)) {
+			res = -1;
+			break;
+		}
+
 		hdr = (struct ipv6cp_opt_hdr_t *)data;
 
-		if (!hdr->len || hdr->len > size)
+		if (hdr->len < sizeof(*hdr) || hdr->len > size) {
+			res = -1;
 			break;
+		}
 
 		list_for_each_entry(lopt, &ipv6cp->options, entry) {
 			if (lopt->id == hdr->id) {
@@ -548,10 +558,17 @@ static int ipv6cp_recv_conf_nak(struct ppp_ipv6cp_t *ipv6cp, uint8_t *data, int 
 	}*/
 
 	while (size > 0) {
+		if (size < sizeof(*hdr)) {
+			res = -1;
+			break;
+		}
+
 		hdr = (struct ipv6cp_opt_hdr_t *)data;
 
-		if (!hdr->len || hdr->len > size)
+		if (hdr->len < sizeof(*hdr) || hdr->len > size) {
+			res = -1;
 			break;
+		}
 
 		list_for_each_entry(lopt, &ipv6cp->options, entry) {
 			if (lopt->id == hdr->id) {
@@ -591,10 +608,17 @@ static int ipv6cp_recv_conf_ack(struct ppp_ipv6cp_t *ipv6cp, uint8_t *data, int 
 	}*/
 
 	while (size > 0) {
+		if (size < sizeof(*hdr)) {
+			res = -1;
+			break;
+		}
+
 		hdr = (struct ipv6cp_opt_hdr_t *)data;
 
-		if (!hdr->len || hdr->len > size)
+		if (hdr->len < sizeof(*hdr) || hdr->len > size) {
+			res = -1;
 			break;
+		}
 
 		list_for_each_entry(lopt, &ipv6cp->options, entry) {
 			if (lopt->id == hdr->id) {
@@ -729,8 +753,10 @@ static void ipv6cp_recv(struct ppp_handler_t*h)
 				ppp_fsm_recv_conf_ack(&ipv6cp->fsm);
 			break;
 		case CONFNAK:
-			ipv6cp_recv_conf_nak(ipv6cp,(uint8_t*)(hdr + 1), ntohs(hdr->len) - PPP_HDRLEN);
-			ppp_fsm_recv_conf_rej(&ipv6cp->fsm);
+			if (ipv6cp_recv_conf_nak(ipv6cp,(uint8_t*)(hdr + 1), ntohs(hdr->len) - PPP_HDRLEN))
+				ap_session_terminate(&ipv6cp->ppp->ses, TERM_USER_ERROR, 0);
+			else
+				ppp_fsm_recv_conf_rej(&ipv6cp->fsm);
 			break;
 		case CONFREJ:
 			if (ipv6cp_recv_conf_rej(ipv6cp, (uint8_t*)(hdr + 1), ntohs(hdr->len) - PPP_HDRLEN))
