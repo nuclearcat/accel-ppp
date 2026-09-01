@@ -699,7 +699,7 @@ static void ipv6cp_recv(struct ppp_handler_t*h)
 	}
 
 	hdr = (struct ipv6cp_hdr_t *)ipv6cp->ppp->buf;
-	if (ntohs(hdr->len) < PPP_HEADERLEN) {
+	if (ntohs(hdr->len) < PPP_HEADERLEN || ntohs(hdr->len) > ipv6cp->ppp->buf_size - 2) {
 		log_ppp_warn("IPV6CP: short packet received\n");
 		return;
 	}

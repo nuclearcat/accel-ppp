@@ -695,7 +695,7 @@ static void ipcp_recv(struct ppp_handler_t*h)
 	}
 
 	hdr = (struct ipcp_hdr_t *)ipcp->ppp->buf;
-	if (ntohs(hdr->len) < PPP_HEADERLEN) {
+	if (ntohs(hdr->len) < PPP_HEADERLEN || ntohs(hdr->len) > ipcp->ppp->buf_size - 2) {
 		log_ppp_warn("IPCP: short packet received\n");
 		return;
 	}
