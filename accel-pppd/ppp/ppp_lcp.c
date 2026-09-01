@@ -370,13 +370,18 @@ static int lcp_recv_conf_req(struct ppp_lcp_t *lcp, uint8_t *data, int size)
 	lcp->ropt_len = size;
 
 	while (size > 0) {
-		if (size < sizeof(*hdr))
+		if (size < sizeof(*hdr)) {
+			log_ppp_warn("LCP: ConfReq: truncated option header (%i bytes left)\n", size);
 			return LCP_OPT_FAIL;
+		}
 
 		hdr = (struct lcp_opt_hdr_t *)data;
 
-		if (hdr->len < sizeof(*hdr) || hdr->len > size)
+		if (hdr->len < sizeof(*hdr) || hdr->len > size) {
+			log_ppp_warn("LCP: ConfReq: invalid length %i of option %i (%i bytes left)\n",
+				     hdr->len, hdr->id, size);
 			return LCP_OPT_FAIL;
+		}
 
 		ropt = _malloc(sizeof(*ropt));
 		memset(ropt, 0, sizeof(*ropt));

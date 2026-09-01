@@ -391,13 +391,18 @@ static int ipcp_recv_conf_req(struct ppp_ipcp_t *ipcp, uint8_t *data, int size)
 	ipcp->ropt_len = size;
 
 	while (size > 0) {
-		if (size < sizeof(*hdr))
+		if (size < sizeof(*hdr)) {
+			log_ppp_warn("IPCP: ConfReq: truncated option header (%i bytes left)\n", size);
 			return IPCP_OPT_FAIL;
+		}
 
 		hdr = (struct ipcp_opt_hdr_t *)data;
 
-		if (hdr->len < sizeof(*hdr) || hdr->len > size)
+		if (hdr->len < sizeof(*hdr) || hdr->len > size) {
+			log_ppp_warn("IPCP: ConfReq: invalid length %i of option %i (%i bytes left)\n",
+				     hdr->len, hdr->id, size);
 			return IPCP_OPT_FAIL;
+		}
 
 		ropt = _malloc(sizeof(*ropt));
 		memset(ropt, 0, sizeof(*ropt));

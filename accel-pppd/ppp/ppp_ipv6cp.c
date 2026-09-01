@@ -395,13 +395,18 @@ static int ipv6cp_recv_conf_req(struct ppp_ipv6cp_t *ipv6cp, uint8_t *data, int 
 	ipv6cp->ropt_len = size;
 
 	while (size > 0) {
-		if (size < sizeof(*hdr))
+		if (size < sizeof(*hdr)) {
+			log_ppp_warn("IPV6CP: ConfReq: truncated option header (%i bytes left)\n", size);
 			return IPV6CP_OPT_FAIL;
+		}
 
 		hdr = (struct ipv6cp_opt_hdr_t *)data;
 
-		if (hdr->len < sizeof(*hdr) || hdr->len > size)
+		if (hdr->len < sizeof(*hdr) || hdr->len > size) {
+			log_ppp_warn("IPV6CP: ConfReq: invalid length %i of option %i (%i bytes left)\n",
+				     hdr->len, hdr->id, size);
 			return IPV6CP_OPT_FAIL;
+		}
 
 		ropt = _malloc(sizeof(*ropt));
 		memset(ropt, 0, sizeof(*ropt));

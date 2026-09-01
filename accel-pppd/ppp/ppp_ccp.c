@@ -387,13 +387,18 @@ static int ccp_recv_conf_req(struct ppp_ccp_t *ccp, uint8_t *data, int size)
 	ccp->ropt_len = size;
 
 	while (size > 0) {
-		if (size < sizeof(*hdr))
+		if (size < sizeof(*hdr)) {
+			log_ppp_warn("CCP: ConfReq: truncated option header (%i bytes left)\n", size);
 			return CCP_OPT_FAIL;
+		}
 
 		hdr = (struct ccp_opt_hdr_t *)data;
 
-		if (hdr->len < sizeof(*hdr) || hdr->len > size)
+		if (hdr->len < sizeof(*hdr) || hdr->len > size) {
+			log_ppp_warn("CCP: ConfReq: invalid length %i of option %i (%i bytes left)\n",
+				     hdr->len, hdr->id, size);
 			return CCP_OPT_FAIL;
+		}
 
 		ropt = _malloc(sizeof(*ropt));
 		memset(ropt, 0, sizeof(*ropt));
