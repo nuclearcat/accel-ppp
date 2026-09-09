@@ -123,6 +123,10 @@ def test_pppoe_ccp_ipcp_race(pppd_instance, accel_cmd, accel_pppd_log_file, veth
         (veth_pair_netns["netns"], veth_pair_netns["veth_b"]),
     ):
         netns.exec(ns, ["sh", "-c", "cat /proc/net/pppoe; ip -s link show " + ifname])
+    netns.exec(
+        None,
+        ["sh", "-c", "journalctl -b --no-pager | grep -i " + veth_pair_netns["veth_a"] + " | tail -30"],
+    )
 
     with open(accel_pppd_log_file, "r") as f:
         log = f.read().splitlines()

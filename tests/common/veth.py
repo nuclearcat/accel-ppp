@@ -3,10 +3,14 @@ import time
 import math
 
 # creates veth pair. if ok returns 0
-def create_pair(name_a, name_b):
-    veth, out, err = process.run(
-        ["ip", "link", "add", name_a, "type", "veth", "peer", "name", name_b]
-    )
+def create_pair(name_a, name_b, mac_a=None, mac_b=None):
+    command = ["ip", "link", "add", name_a]
+    if mac_a:
+        command += ["address", mac_a]
+    command += ["type", "veth", "peer", "name", name_b]
+    if mac_b:
+        command += ["address", mac_b]
+    veth, out, err = process.run(command)
     print("veth.create: exit=%d out=%s err=%s" % (veth, out, err))
 
     return veth
@@ -32,7 +36,9 @@ def create_veth_pair_netns(veth_pair_vlans_config):
 
     veth_a = "A" + name
     veth_b = "B" + name
-    pair_status = create_pair(veth_a, veth_b)
+    num = int(name)
+    mac = "02:00:%02x:%02x:%02x:" % ((num >> 16) & 0xFF, (num >> 8) & 0xFF, num & 0xFF)
+    pair_status = create_pair(veth_a, veth_b, mac + "0a", mac + "0b")
     print("create_veth_pair_netns: pair_status=%d" % pair_status)
 
     iface.up(veth_a, None)
