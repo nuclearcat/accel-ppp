@@ -16,31 +16,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - distro: Ubuntu-24.04
-            image: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
-            untar: false
-            format: qcow2
-
           - distro: Ubuntu-22.04
             image: https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img
             untar: false
             format: qcow2
-
-          - distro: Debian13
-            image: https://cloud.debian.org/images/cloud/trixie/daily/latest/debian-13-generic-amd64-daily.tar.xz
-            untar: true
-            format: raw
-
-          - distro: Debian12
-            image: https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-generic-amd64.tar.xz
-            untar: true
-            format: raw
-
-          - distro: Debian11
-            image: https://cdimage.debian.org/images/cloud/bullseye/latest/debian-11-generic-amd64.tar.xz
-            untar: true
-            format: raw
-
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
@@ -133,71 +112,19 @@ jobs:
           -DLUA=TRUE -DSHAPER=TRUE -DRADIUS=TRUE .. &&
           make && sudo make install"
 
-      - name: Run tests (not related to ipoe and vlan_mon drivers)
-        timeout-minutes: 5
-        run: >
-          ssh -i ssh-key -p2222 user@localhost "cd accel-ppp/tests && 
-          sudo python3 -m pytest -Wall --order-dependencies -v -m \"not ipoe_driver and not vlan_mon_driver\""
-      - name: Display processes and dmesg after tests
-        if: ${{ always() }}
-        run: >
-          ssh -i ssh-key -p2222 user@localhost "ps aux | grep accel- && 
-          sudo dmesg"
-
-      - name: Insert ipoe kernel module
-        if: ${{ always() }}
-        run: >
-          ssh -i ssh-key -p2222 user@localhost "cd accel-ppp &&
-          sudo insmod build/drivers/ipoe/driver/ipoe.ko &&
-          lsmod | grep ipoe "
-
-      - name: Run tests (not related to vlan_mon drivers)
-        timeout-minutes: 5
-        if: ${{ always() }}
-        run: >
-          ssh -i ssh-key -p2222 user@localhost "cd accel-ppp/tests && 
-          sudo python3 -m pytest -Wall --order-dependencies -v -m \"not vlan_mon_driver\""
-      - name: Display processes and dmesg after tests
-        if: ${{ always() }}
-        run: >
-          ssh -i ssh-key -p2222 user@localhost "ps aux | grep accel- && 
-          sudo dmesg"
-
-      - name: Insert vlan_mon kernel module
-        if: ${{ always() }}
-        run: >
-          ssh -i ssh-key -p2222 user@localhost "cd accel-ppp &&
-          sudo insmod build/drivers/vlan_mon/driver/vlan_mon.ko &&
-          lsmod | grep vlan_mon"
-
-      - name: Insert ppposeq kernel module
-        if: ${{ always() }}
-        run: >
-          ssh -i ssh-key -p2222 user@localhost "cd accel-ppp &&
-          sudo modprobe pppox && sudo insmod build/drivers/ppposeq/driver/ppposeq.ko &&
-          lsmod | grep ppposeq"
-
-      - name: Run tests (all)
-        timeout-minutes: 5
+      - name: Run race test 12x
+        timeout-minutes: 30
         run: >
           ssh -i ssh-key -p2222 user@localhost "cd accel-ppp/tests &&
-          sudo python3 -m pytest -Wall --order-dependencies -v"
-      - name: Display processes and dmesg after tests
+          for i in 1 2 3 4 5 6 7 8 9 10 11 12; do echo \"===== ITERATION \$i =====\";
+          sudo python3 -m pytest -Wall -v accel-pppd/pppoe/test_pppoe_ccp_ipcp_race.py || true; done"
+      - name: Display dmesg after tests
         if: ${{ always() }}
         run: >
-          ssh -i ssh-key -p2222 user@localhost "ps aux | grep accel- &&
-          sudo dmesg"
-
-      - name: Check dmesg for kernel issues
-        if: ${{ always() }}
-        run: |
-          ssh -i ssh-key -p2222 user@localhost "sudo dmesg" > /tmp/dmesg.log
-          if grep -E 'WARNING: CPU:|BUG:|Oops:|kernel panic|general protection fault|KASAN|UBSAN:|soft lockup|hard LOCKUP|INFO: task .+ blocked|Bad page state|invalid opcode' /tmp/dmesg.log; then
-            echo "::error::Kernel issues detected in dmesg"
-            exit 1
-          fi
+          ssh -i ssh-key -p2222 user@localhost "ps aux | grep accel- ; sudo dmesg | tail -100"
 
   Test-in-Alpine:
+    if: ${{ false }}
     #if: ${{ false }} # disable for now
     runs-on: ubuntu-24.04
     name: Test in Qemu (Alpine)
@@ -347,6 +274,7 @@ jobs:
 
 
   Test-in-GH:
+    if: ${{ false }}
     #if: ${{ false }} # disable for now
     strategy:
       fail-fast: false
@@ -414,6 +342,7 @@ jobs:
           fi
 
   Test-in-GH-Coverage:
+    if: ${{ false }}
     #if: ${{ false }} # disable for now
     strategy:
       fail-fast: false

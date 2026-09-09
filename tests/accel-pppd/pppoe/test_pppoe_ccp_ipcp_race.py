@@ -114,12 +114,12 @@ def test_pppoe_ccp_ipcp_race(pppd_instance, accel_cmd, accel_pppd_log_file):
 
     print("test_pppoe_ccp_ipcp_race: last accel-cmd out: " + out)
 
-    # test that session is started
-    assert is_started == True
-
     with open(accel_pppd_log_file, "r") as f:
         log = f.read().splitlines()
     print("test_pppoe_ccp_ipcp_race: accel-pppd log:\n" + "\n".join(log))
+
+    # test that session is started
+    assert is_started == True
 
     ccp_started = [i for i, line in enumerate(log) if "ccp_layer_started" in line]
     assert len(ccp_started) > 0  # CCP was negotiated
