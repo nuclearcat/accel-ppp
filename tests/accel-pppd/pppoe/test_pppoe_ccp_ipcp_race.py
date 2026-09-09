@@ -1,5 +1,5 @@
 import pytest
-from common import process, config
+from common import process, config, netns
 import time
 
 
@@ -53,6 +53,7 @@ def accel_pppd_config(veth_pair_netns, chap_secrets_config_file, accel_pppd_log_
     tcp=127.0.0.1:2001
 
     [pppoe]
+    verbose=1
     interface="""
         + veth_pair_netns["veth_a"]
         + """
@@ -71,6 +72,7 @@ def pppd_config(veth_pair_netns):
     return (
         """
     nodetach
+    debug
     noipdefault
     noauth
     persist
@@ -88,7 +90,7 @@ def pppd_config(veth_pair_netns):
 # IPCP ConfReq received while CCP is still negotiating must not be answered
 # with a TermAck: the ack is withheld and sent when CCP is done
 @pytest.mark.chap_secrets
-def test_pppoe_ccp_ipcp_race(pppd_instance, accel_cmd, accel_pppd_log_file):
+def test_pppoe_ccp_ipcp_race(pppd_instance, accel_cmd, accel_pppd_log_file, veth_pair_netns):
 
     # test that pppd (with accel-pppd) started successfully
     assert pppd_instance["is_started"]
@@ -113,6 +115,14 @@ def test_pppoe_ccp_ipcp_race(pppd_instance, accel_cmd, accel_pppd_log_file):
         sleep_time += 0.1
 
     print("test_pppoe_ccp_ipcp_race: last accel-cmd out: " + out)
+
+    # diagnostics: kernel pppoe session table and per-interface counters on
+    # both ends of the veth pair
+    for ns, ifname in (
+        (None, veth_pair_netns["veth_a"]),
+        (veth_pair_netns["netns"], veth_pair_netns["veth_b"]),
+    ):
+        netns.exec(ns, ["sh", "-c", "cat /proc/net/pppoe; ip -s link show " + ifname])
 
     with open(accel_pppd_log_file, "r") as f:
         log = f.read().splitlines()
